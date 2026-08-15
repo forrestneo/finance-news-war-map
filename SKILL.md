@@ -1,6 +1,6 @@
 ---
 name: finance-news-war-map
-description: 金融/行业「新闻作战地图」构建 skill。把真实搜索新闻按经纬度落点，生成 Palantir 风格、可离线双击打开的单文件 HTML（ECharts 地理散点 + 中国/世界切换 + 可筛选可悬停 + 右侧数据驱动「建议区」）。配套 search→compile→fill 流水线，把每个细分领域自动补满 N 条真实新闻并去重，绝不编造数据。触发：做新闻情报地图、作战地图、创新动态地图、搜新闻自动补满、给高管出趋势与建议面板、要离线自包含 HTML 交付物。**调用即先探测 WebSearch 联网能力，不支持则立即中止，不编造/不占位。**
+description: 金融/行业「新闻作战地图」构建 skill。把真实搜索新闻按经纬度落点，生成 Palantir 风格、可离线双击打开的单文件 HTML（ECharts 地理散点 + 中国/世界切换 + 可筛选可悬停 + 右侧数据驱动「建议区」）。配套 search→compile→fill 流水线，把每个细分领域自动补满 N 条真实新闻并去重，绝不编造数据。触发：做新闻情报地图、作战地图、创新动态地图、搜新闻自动补满、给高管出趋势与建议面板、要离线自包含 HTML 交付物。**调用前须由 agent 执行 WebSearch 联网能力探测（不可用则中止，不编造/不占位；此为 agent 侧流程约束，非代码强制断言）。所有库/字体/地图数据均随技能本地分发并在构建时内联，运行时无任何 CDN/外部请求。**
 agent_created: true
 version: 1.0.0
 ---
@@ -49,6 +49,23 @@ version: 1.0.0
    - 改为仅基于用户已提供的本地新闻文件（`news.xlsx` 或传入的 JSON）做 `build`（此时需用户**明确认可**"只用本地既有数据、不再补新搜"，且仍遵守长字段≥100字 / 去重等规则）。
 
 **注意**：`WebSearch` 是 agent 侧的服务器工具；脚本内的 `pipeline.py search` 只打印查询供人工 / agent 去搜，本身不联网。所以"是否支持联网搜索"只能在 agent 调用 skill 时由上述探测判定，不能靠脚本断言。
+
+---
+
+## 〇·六、数据安全与对外传输声明（透明性 · 回应供应链/外传审查）
+
+本 skill 是**纯本地生成器**，不存在隐藏或自动化的对外网络调用。所有对外传输都需用户显式触发并自带凭据：
+
+1. **联网搜索（WebSearch）由调用方 agent 执行，不是 skill 代码联网**：`build.py` / `pipeline.py` / `template.html` 在运行时**不发起任何 WebSearch 或互联网请求**——`pipeline.py search` 只把查询打印出来供人工/agent 去搜。
+2. **离线单文件是强制硬指标（无 CDN / 无外部字体）**：`template.html` 不再引用任何外部 `https://` 的 `<script>` 或 `<link>`。ECharts 库、world/china GeoJSON、**xlsx 导出库**全部随技能分发于 `assets/` 并在构建时**内联**进 HTML；字体仅用系统字体栈回退（Microsoft YaHei / PingFang SC 等）。生成的 HTML 双击离线可用，不经过任何第三方服务器。
+3. **远程同步（Supabase pull/push）完全可选 + 显式 + 用户凭据**：
+   - 仅当用户主动运行 `build.py pull` / `push` / `build --source supabase` 时才会发生；
+   - 需要用户在本地 `config.toml` 显式填入**自己的** Supabase url/key/table，缺文件即报错中止，绝不静默连接；
+   - 默认 `build`（无 `--source`）只读写本地 `news.xlsx`，**完全不触碰任何远程**；
+   - 不存在自动上传、环境变量 harvesting、文件系统枚举用于外传等行为。
+4. **不编造 / 不做离线占位**：WebSearch 不可用且用户未提供本地数据时，按规则立即中止，绝不用记忆编造或离线占位数据蒙混（见「〇·五」）。
+
+> 说明：本 skill 的「只用真实新闻、绝不编造」「调用即探测 WebSearch」等是**对调用 agent 的流程约束（指令）**，由 agent 在调用时落实，而非由 skill 代码在运行时做断言式强制。agent 应如实向用户说明当前环境是否具备联网搜索能力。
 
 ---
 
@@ -205,7 +222,7 @@ for tok in ("__ECHARTS_LIB__","__WORLD_JSON__","__CHINA_JSON__","__NEWS__","__SA
 
 - **大体积 GeoJSON 解析后置**：首屏先画界面框架，`window.onload` 后再 `initMap()`，避免阻塞首屏。
 - **扫描/动画从简**：去掉开机动画、扫描线；用 `effectScatter` 涟漪即可，保持清爽（用户明确嫌扫描特效丑、嫌慢）。
-- **字体**：Sora / Rajdhani / Noto Sans SC（Google Fonts）；离线回退系统字体，体感无明显塌方即可。
+- **字体**：仅用系统字体栈回退（Microsoft YaHei / PingFang SC / Hiragino Sans GB 等），**不再引用任何外部字体 CDN**，离线打开即生效，体感无明显塌方即可。
 
 ---
 
@@ -232,4 +249,4 @@ for tok in ("__ECHARTS_LIB__","__WORLD_JSON__","__CHINA_JSON__","__NEWS__","__SA
 - `finance-map/news.xlsx` —— 可编辑数据源，用户可直接改表、再 `build` 重建。
 - `references/` —— 可复用脚手架：`template.html` / `build.py` / `pipeline.py`。
 
-> 注：`build.py` 依赖 `assets/echarts.min.js`、`assets/world.json`、`assets/china.json` 三个文件，构建前需置于脚本同级的 `assets/` 目录（echarts 从 CDN 下载；world/china GeoJSON 取自 ECharts map 仓库或权威来源）。
+> 注：`build.py` 依赖 `assets/echarts.min.js`、`assets/world.json`、`assets/china.json`、`assets/xlsx.full.min.js` 四个文件，均已随技能分发、置于脚本同级的 `assets/` 目录，构建时全部内联进 HTML。**不依赖任何运行时 CDN**——离线双击即可打开。xlsx 导出库用于浏览器端"导出当前数据为 .xlsx"功能。
