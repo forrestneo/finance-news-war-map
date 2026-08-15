@@ -93,7 +93,37 @@ assets/       echarts.min.js + world.json + china.json（34 省）← 构建时�
 | `__SAMPLE__` | `true`/`false`（是否示例水印） |
 | `__SUGGESTIONS__` | 建议区结构化 JSON（build 时计算） |
 
-`references/` 目录里是可直接复用的脚手架：`template.html`、`build.py`、`pipeline.py`。
+`references/` 目录里是可直接复用的脚手架（**自包含，无需联网下载额外文件**）：
+
+```
+references/
+├── template.html          # Palantir 风三栏地图模板（含占位符，离线单文件目标）
+├── build.py               # 生成器：init/build/merge/replace + 建议区计算 + 去重
+├── pipeline.py            # 20 子领域 taxonomy 驱动的 search/status/fill/rebuild 补满流水线
+├── news_sample.json       # 内置示例数据源（11 条，init/build 缺 xlsx 时回退用）
+├── db.py                  # Supabase 读写（可选，pull/push 用；凭据走本地 config.toml）
+├── config.example.toml    # Supabase 配置样例
+└── assets/               # 离线单文件必需，已随技能分发
+    ├── echarts.min.js     # ~1MB，内联进 HTML
+    ├── world.json         # ~1MB，世界地图边界
+    └── china.json         # 中国 34 省边界
+```
+
+### 三·5、环境准备（依赖与目录约定）
+
+1. **装依赖**：`pip install -r requirements.txt`（核心只要 `openpyxl`；`supabase` 仅 pull/push 时需要）。
+2. **数据/产物落在「当前工作目录（CWD），不污染技能安装目录**——这是本 skill 的可分发约定：
+   - 只读资产（`template.html` / `assets/` / `news_sample.json`）随技能分发，安装后不应改动；
+   - `build.py` 把 `news.xlsx`（数据源）与 `金融创新全球作战地图.html`（产物）写到你**运行命令时所在的目录**；
+   - 所以在你自己的项目目录里运行 `build.py` / `pipeline.py` 即可，不要在技能安装目录内直接写。
+3. **快速开始**（在你自己的项目目录执行）：
+   ```bash
+   python build.py init          # 用内置示例生成 news.xlsx（可编辑数据源）
+   python build.py build         # 读 news.xlsx -> 生成离线单文件 HTML 到当前目录
+   # 或跳过 init，直接 build（缺 news.xlsx 时自动回退示例）
+   python build.py build --role "浙江省分行行长"   # 指定建议区视角后固化进 HTML
+   ```
+4. **联网能力前置（Gate）**：本 skill 的「新闻」来自真实 WebSearch，**必须**先按「〇·五、环境前置检查」探测 WebSearch 可用；不可用时立即停止，绝不编造/占位。
 
 ---
 
