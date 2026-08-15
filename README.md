@@ -56,16 +56,44 @@
 
 ---
 
+## 环境准备（Setup）
+
+```bash
+# 1. 安装依赖（核心只需 openpyxl；supabase 仅 pull/push 时需要）
+pip install -r requirements.txt
+
+# 2. 在你自己的项目目录里运行（数据与产物写到「当前工作目录」，不污染技能安装目录）
+cd your-project-dir
+python references/build.py init     # 用内置示例生成 news.xlsx（可编辑数据源）
+python references/build.py build    # 读 news.xlsx -> 生成离线单文件 HTML 到当前目录
+
+# 跳过 init 直接 build 也行（缺 news.xlsx 时自动回退内置示例）
+python references/build.py build --role "浙江省分行行长"   # 指定建议区视角并固化进 HTML
+```
+
+> 只读资产（`template.html` / `assets/` / `news_sample.json`）已随仓库分发，无需联网下载。
+
+---
+
 ## 文件结构
 
 ```
 finance-news-war-map/
 ├── SKILL.md              # 方法论总结（何时用 / 硬规则 / 架构 / 工作流 / 关键代码模式 / 坑）
-├── references/
-│   ├── template.html     # Palantir 风三栏地图模板（6 个占位符、中国/世界切换、右侧建议区）
-│   ├── build.py          # 生成器（build / 建议区计算 / norm_key / dedup）
-│   └── pipeline.py       # 20 子领域 taxonomy 驱动的 search/status/fill/rebuild 补满流水线
-└── README.md
+├── README.md
+├── requirements.txt      # 依赖：openpyxl（核心）/ supabase（可选）
+├── .gitignore
+└── references/
+    ├── template.html     # Palantir 风三栏地图模板（占位符、中国/世界切换、右侧建议区）
+    ├── build.py          # 生成器（init/build/merge/replace + 建议区计算 + 去重）
+    ├── pipeline.py       # 20 子领域 taxonomy 驱动的 search/status/fill/rebuild 补满流水线
+    ├── news_sample.json  # 内置示例数据源（11 条，init/build 缺 xlsx 时回退用）
+    ├── db.py             # Supabase 读写（可选，pull/push 用；凭据走本地 config.toml）
+    ├── config.example.toml
+    └── assets/           # 离线单文件必需，已随仓库分发
+        ├── echarts.min.js
+        ├── world.json
+        └── china.json
 ```
 
 ---
