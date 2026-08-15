@@ -1,4 +1,4 @@
-# finance-news-war-map
+# finance-news-warmap
 
 > 金融 / 行业「新闻作战地图」构建 Skill —— Palantir 风格、可离线双击打开的单文件 HTML 生成器。
 
@@ -78,7 +78,7 @@ python references/build.py build --role "浙江省分行行长"   # 指定建议
 ## 文件结构
 
 ```
-finance-news-war-map/
+finance-news-warmap/
 ├── SKILL.md              # 方法论总结（何时用 / 硬规则 / 架构 / 工作流 / 关键代码模式 / 坑）
 ├── README.md
 ├── requirements.txt      # 依赖：openpyxl（核心）/ supabase（可选）
@@ -121,7 +121,7 @@ finance-news-war-map/
 
 ## 在 WorkBuddy 中使用
 
-1. 将本仓库内容放入 `~/.workbuddy/skills/finance-news-war-map/`（或项目级 `.workbuddy/skills/`）。
+1. 将本仓库内容放入 `~/.workbuddy/skills/finance-news-warmap/`（或项目级 `.workbuddy/skills/`）。
 2. 调用该 Skill，按 Question Flow 回答必要项（角色必问）。
 3. Skill 自动执行 search → compile → fill → build，产出 `金融创新全球作战地图.html` + `news.xlsx`。
 
