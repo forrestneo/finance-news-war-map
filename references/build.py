@@ -16,11 +16,14 @@ from collections import Counter
 import openpyxl
 
 HERE = pathlib.Path(__file__).resolve().parent
+# 只读技能资产（随技能分发，安装后不应被改写）
 TEMPLATE = HERE / "template.html"
-OUT_HTML = HERE.parent / "金融创新全球作战地图.html"
-ASSETS = HERE / "assets"
-XLSX = HERE / "news.xlsx"
-SAMPLE = HERE / "news_sample.json"
+ASSETS = HERE / "assets"                 # echarts.min.js / world.json / china.json
+SAMPLE = HERE / "news_sample.json"       # 内置示例数据源
+# 数据与产物落在「用户当前工作目录」，避免写入技能安装目录（可分发、不污染自身）
+WORKDIR = pathlib.Path.cwd()
+XLSX = WORKDIR / "news.xlsx"
+OUT_HTML = WORKDIR / "金融创新全球作战地图.html"
 
 COLUMNS = ["time","category","direction","company","city","lng","lat","title","link","event","why","innovation","learn"]
 
