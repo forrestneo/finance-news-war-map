@@ -9,7 +9,7 @@
   .venv/Scripts/python build.py pull                 # Supabase -> news.xlsx
   .venv/Scripts/python build.py push                # news.xlsx -> Supabase（按 title upsert，自动去重）
   .venv/Scripts/python build.py merge <json文件>     # 把真实新闻并入 news.xlsx，已存在的自动跳过（去重）
-  .venv/Scripts/python build.py replace <json文件>   # 清空虚拟示例，用真实新闻替换（仍按内容去重）
+  .venv/Scripts/python build.py replace <json文件>   # 只移除示例行，用真实新闻替换（保留已有真实数据，按内容去重）
 """
 import argparse, json, pathlib, re, sys
 from collections import Counter
@@ -25,7 +25,7 @@ WORKDIR = pathlib.Path.cwd()
 XLSX = WORKDIR / "news.xlsx"
 OUT_HTML = WORKDIR / "金融创新全球作战地图.html"
 
-COLUMNS = ["time","category","direction","company","city","lng","lat","title","link","event","why","innovation","learn"]
+COLUMNS = ["time","category","direction","company","city","lng","lat","title","link","event","why","innovation","learn","is_sample"]
 
 # ---------------------------------------------------------------------------
 # 建议区（右侧面板）内容生成 —— 数据驱动；每次 build 都基于当前新闻重新计算
@@ -271,6 +271,7 @@ def xlsx_to_news(path):
             "title": d.get("title"), "link": d.get("link"),
             "event": d.get("event"), "why": d.get("why"),
             "innovation": d.get("innovation"), "learn": d.get("learn"),
+            "is_sample": bool(d.get("is_sample")),
         })
     return out
 
@@ -279,8 +280,17 @@ def news_to_xlsx(news, path):
     ws = wb.active
     ws.append(COLUMNS)
     for n in news:
-        ws.append([n.get(c) if c not in ("lng","lat") else (n["coord"][0] if c=="lng" else n["coord"][1])
-                   for c in COLUMNS])
+        row = []
+        for c in COLUMNS:
+            if c == "lng":
+                row.append(n["coord"][0] if n.get("coord") else None)
+            elif c == "lat":
+                row.append(n["coord"][1] if n.get("coord") else None)
+            elif c == "is_sample":
+                row.append(bool(n.get("is_sample", False)))
+            else:
+                row.append(n.get(c))
+        ws.append(row)
     wb.save(path)
 
 def build_html(news, is_sample=False, source="xlsx", role=None):
@@ -289,16 +299,18 @@ def build_html(news, is_sample=False, source="xlsx", role=None):
     echarts = (ASSETS / "echarts.min.js").read_text(encoding="utf-8")
     world = (ASSETS / "world.json").read_text(encoding="utf-8")
     china = (ASSETS / "china.json").read_text(encoding="utf-8")
+    xlsx_lib = (ASSETS / "xlsx.full.min.js").read_text(encoding="utf-8")
     news_js = json.dumps(news, ensure_ascii=False, indent=2)
     sugg_js = json.dumps(build_suggestions(news, role=role), ensure_ascii=False, indent=2)
     out = (tpl
            .replace("__ECHARTS_LIB__", echarts)
            .replace("__WORLD_JSON__", world.strip())
            .replace("__CHINA_JSON__", china.strip())
+           .replace("__XLSX_LIB__", xlsx_lib)
            .replace("__NEWS__", news_js)
            .replace("__SAMPLE__", "true" if is_sample else "false")
            .replace("__SUGGESTIONS__", sugg_js))
-    for tok in ("__ECHARTS_LIB__","__WORLD_JSON__","__CHINA_JSON__","__NEWS__","__SAMPLE__","__SUGGESTIONS__"):
+    for tok in ("__ECHARTS_LIB__","__WORLD_JSON__","__CHINA_JSON__","__XLSX_LIB__","__NEWS__","__SAMPLE__","__SUGGESTIONS__"):
         assert tok not in out, f"占位符未替换: {tok}"
     OUT_HTML.write_text(out, encoding="utf-8")
     print(f"已生成：{OUT_HTML}  ({OUT_HTML.stat().st_size//1024} KB, {len(news)} 条新闻)")
@@ -310,6 +322,8 @@ def build(source="xlsx", role=None):
 
 def cmd_init():
     news = json.loads(SAMPLE.read_text(encoding="utf-8"))
+    for n in news:
+        n["is_sample"] = True          # 标记为示例，replace 时只清这些行
     news_to_xlsx(news, XLSX)
     print(f"已生成可编辑数据源：{XLSX}  ({len(news)} 行，标记为示例数据)")
 
@@ -326,9 +340,15 @@ def cmd_push():
     db.push(news)
 
 def cmd_merge(json_path, clear=False):
-    """并入真实新闻：clear=True 先清空（去虚拟示例），否则在现有 xlsx 基础上叠加；均按内容去重。"""
+    """并入真实新闻：clear=True 为 replace 模式，只移除标记为示例(is_sample)的行，
+    绝不删除用户已整理的真实数据；均按内容去重。"""
     incoming = json.loads(pathlib.Path(json_path).read_text(encoding="utf-8"))
-    existing = [] if clear or not XLSX.exists() else xlsx_to_news(XLSX)
+    existing = xlsx_to_news(XLSX) if XLSX.exists() else []
+    if clear:
+        total = len(existing)
+        existing = [n for n in existing if not n.get("is_sample")]
+        dropped = total - len(existing)
+        print(f"replace 模式：已移除 {dropped} 条示例数据，保留 {len(existing)} 条真实数据")
     before = len(existing) + len(incoming)
     merged = dedup(existing + incoming)   # existing 在前，已存在条目不会被覆盖/重复
     skipped = before - len(merged)
