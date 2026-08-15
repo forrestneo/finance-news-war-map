@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>金融创新动态 · 中国作战地图</title>
+<script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Rajdhani:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#05080f; --panel:#0a121f; --panel2:#0d1828; --border:#1c2a3a;
+    --text:#e8eef6; --muted:#9fb2c9; --dim:#5d7088;
+    --cyan:#26e0ff; --amber:#ffb43d; --violet:#b388ff;
+    --mono:"Rajdhani","SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --cn:"Noto Sans SC","Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+    --display:"Sora","Noto Sans SC",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--cn);background:var(--bg);color:var(--text);overflow:hidden;display:flex;flex-direction:column}
+  body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(1200px 700px at 72% 28%, rgba(38,224,255,.10), transparent 60%),
+      radial-gradient(900px 600px at 18% 82%, rgba(255,180,61,.07), transparent 60%),
+      radial-gradient(700px 500px at 50% 50%, rgba(179,136,255,.05), transparent 70%),
+      linear-gradient(transparent 95%, rgba(38,224,255,.05) 95%) 0 0/100% 40px,
+      linear-gradient(90deg, transparent 95%, rgba(38,224,255,.05) 95%) 0 0/40px 100%}
+  body::after{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:radial-gradient(125% 125% at 50% 50%, transparent 52%, rgba(0,0,0,.55))}
+
+  /* ---------- 顶栏 ---------- */
+  header{position:relative;z-index:5;height:64px;flex:0 0 64px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 24px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#0a1322,#060b14)}
+  header::after{content:"";position:absolute;left:0;bottom:-1px;height:1px;width:100%;
+    background:linear-gradient(90deg,transparent,var(--cyan),var(--violet),transparent);opacity:.6}
+  .brand{display:flex;align-items:center;gap:13px}
+  .brand .dot{width:11px;height:11px;border-radius:50%;background:var(--cyan);box-shadow:0 0 16px 3px var(--cyan);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%,100%{opacity:.5;transform:scale(.85)}50%{opacity:1;transform:scale(1.2)}}
+  .brand h1{font-family:var(--display);font-size:20px;font-weight:800;letter-spacing:.5px;
+    background:linear-gradient(90deg,#e8eef6,#26e0ff,#e8eef6);background-size:220% auto;
+    -webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 5s linear infinite}
+  @keyframes shine{to{background-position:220% center}}
+  .brand .sub{font-size:12px;color:var(--muted);font-family:var(--mono);margin-top:2px;letter-spacing:1.5px}
+  .legend{display:flex;gap:11px;align-items:center}
+  .leg{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer;
+    padding:5px 11px;border:1px solid var(--border);border-radius:20px;transition:.2s;font-family:var(--cn)}
+  .leg:hover{border-color:var(--cyan);color:var(--text);box-shadow:0 0 14px rgba(38,224,255,.15)}
+  .leg .sw{width:9px;height:9px;border-radius:50%}
+  .leg.off{opacity:.38}
+  .stats{font-family:var(--mono);font-size:12.5px;color:var(--dim);margin-left:6px;letter-spacing:1px}
+  .stats b{color:var(--cyan);font-weight:700}
+
+  .body{flex:1;display:flex;min-height:0;position:relative;z-index:2}
+  aside{width:372px;flex:0 0 372px;border-right:1px solid var(--border);background:linear-gradient(180deg,#0a111d,#060b14);
+    display:flex;flex-direction:column;min-height:0}
+  .filters{padding:14px 16px 10px;border-bottom:1px solid var(--border)}
+  .search{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:8px 11px;transition:.2s}
+  .search:focus-within{border-color:var(--cyan);box-shadow:0 0 14px rgba(38,224,255,.18)}
+  .search input{flex:1;background:none;border:none;outline:none;color:var(--text);font-family:var(--cn);font-size:13px}
+  .search input::placeholder{color:var(--dim)}
+  .search svg{flex:0 0 15px;opacity:.6}
+  .chips{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+  .chip{font-size:12px;padding:5px 12px;border-radius:16px;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:.18s;user-select:none;font-family:var(--cn)}
+  .chip:hover{color:var(--text);border-color:#2c4258}
+  .chip.active{background:rgba(38,224,255,.14);border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 12px rgba(38,224,255,.2)}
+  .list{flex:1;overflow-y:auto;padding:10px 12px 18px}
+  .list::-webkit-scrollbar{width:7px}
+  .list::-webkit-scrollbar-thumb{background:#1c2a3a;border-radius:4px}
+  .list:not(.ready) .card{animation:cardIn .5s both}
+  @keyframes cardIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+  .card{position:relative;background:var(--panel);border:1px solid var(--border);border-left-width:3px;border-radius:10px;
+    padding:11px 13px;margin-bottom:10px;cursor:pointer;transition:.2s}
+  .card:hover{border-color:var(--cyan);transform:translateX(4px);box-shadow:0 0 20px rgba(38,224,255,.12)}
+  .card.sel{border-color:var(--cyan);background:#0e1f30;box-shadow:0 0 0 1px rgba(38,224,255,.35),0 0 22px rgba(38,224,255,.2)}
+  .card .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .card .time{font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.5px}
+  .tag{font-size:10.5px;padding:2px 8px;border-radius:5px;font-weight:600;font-family:var(--cn)}
+  .card .title{font-size:13.5px;line-height:1.5;font-weight:700;margin-bottom:5px;letter-spacing:.2px}
+  .card .meta{font-size:11.5px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+  .card .meta .loc::before{content:"◉ ";color:var(--cyan)}
+  .card .dir{color:var(--dim)}
+
+  .mapwrap{flex:1;position:relative;min-width:0;overflow:hidden}
+  #map{position:absolute;inset:0}
+
+  .mapbar{position:absolute;top:14px;left:18px;right:18px;z-index:3;display:flex;align-items:center;justify-content:space-between;pointer-events:none}
+  .mapbar > *{pointer-events:auto}
+  .mapbar .left{display:flex;align-items:center;gap:10px}
+  .maptitle{font-size:13px;color:var(--muted);font-family:var(--mono);letter-spacing:2px}
+  .maptitle b{color:var(--cyan);text-shadow:0 0 10px rgba(38,224,255,.5)}
+  .live{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;color:#5dff9b;letter-spacing:1px}
+  .live .l{width:7px;height:7px;border-radius:50%;background:#5dff9b;box-shadow:0 0 10px #5dff9b;animation:pulse 1.6s infinite}
+  .vbtns{display:flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:rgba(8,14,22,.6)}
+  .vbtn{font-size:12px;padding:6px 14px;color:var(--muted);cursor:pointer;background:none;border:none;font-family:var(--cn);transition:.18s}
+  .vbtn.active{background:rgba(38,224,255,.16);color:var(--cyan);text-shadow:0 0 8px rgba(38,224,255,.5)}
+  .mapbar .right{display:flex;align-items:center;gap:10px}
+  .xbtn{font-size:12px;padding:6px 13px;border-radius:9px;border:1px solid var(--border);color:var(--text);
+    background:rgba(8,14,22,.6);cursor:pointer;transition:.18s;font-family:var(--cn)}
+  .xbtn:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 14px rgba(38,224,255,.2)}
+  .coordbar{font-size:11.5px;color:var(--dim);font-family:var(--mono);background:rgba(8,14,22,.6);
+    padding:5px 11px;border:1px solid var(--border);border-radius:8px;letter-spacing:.5px}
+  .clock{font-size:11.5px;color:var(--cyan);font-family:var(--mono);background:rgba(8,14,22,.6);
+    padding:5px 11px;border:1px solid var(--border);border-radius:8px;letter-spacing:1px}
+
+  .detail{position:absolute;left:18px;right:18px;bottom:16px;z-index:4;background:rgba(9,16,26,.93);
+    border:1px solid rgba(38,224,255,.35);border-radius:12px;padding:14px 17px;backdrop-filter:blur(8px);display:none;
+    box-shadow:0 14px 50px rgba(0,0,0,.55),0 0 0 1px rgba(38,224,255,.12) inset;animation:rise .28s ease, glowPulse 3.4s ease-in-out infinite}
+  @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  @keyframes glowPulse{0%,100%{box-shadow:0 14px 50px rgba(0,0,0,.55),0 0 16px rgba(38,224,255,.15) inset}50%{box-shadow:0 14px 50px rgba(0,0,0,.55),0 0 32px rgba(38,224,255,.32) inset}}
+  .detail.show{display:block}
+  .detail .dhead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .detail .dtitle{font-size:15px;font-weight:800;font-family:var(--display);letter-spacing:.3px}
+  .detail .dlink{margin-left:auto;font-size:12px;color:var(--cyan);text-decoration:none;font-family:var(--cn)}
+  .detail .dlink:hover{text-decoration:underline}
+  .detail .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 22px;margin-top:4px}
+  .detail .row{font-size:12.5px;line-height:1.6}
+  .detail .row .k{color:var(--dim);font-weight:600;margin-right:5px;font-family:var(--cn)}
+  .detail .row.full{grid-column:1/3}
+  .detail .close{position:absolute;top:10px;right:12px;cursor:pointer;color:var(--dim);font-size:16px;transition:.18s}
+  .detail .close:hover{color:var(--text);text-shadow:0 0 8px rgba(255,255,255,.4)}
+  .sample-badge{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:3;font-size:11px;color:#ffb43d;
+    font-family:var(--mono);background:rgba(255,180,61,.1);border:1px solid rgba(255,180,61,.35);padding:4px 12px;border-radius:14px;letter-spacing:.5px}
+
+  .news-tip{max-width:370px !important;line-height:1.55}
+  .nt-co{font-size:14px;font-weight:800;color:#fff;margin-bottom:3px;font-family:var(--display)}
+  .nt-meta{font-size:11px;color:#9fb2c9;margin-bottom:8px;font-family:var(--mono);letter-spacing:.5px}
+  .nt-row{font-size:12px;margin:5px 0;color:#d7e2ef;line-height:1.5}
+  .nt-row b{color:#26e0ff;font-weight:600}
+  .nt-row .vi{color:#ffb43d}
+  .nt-row .le{color:#b388ff}
+  .nt-link{color:#26e0ff;font-size:11.5px;word-break:break-all}
+
+  /* ---------- 建议区（右侧） ---------- */
+  .advice{width:364px;flex:0 0 364px;border-left:1px solid var(--border);background:linear-gradient(180deg,#0a111d,#060b14);
+    display:flex;flex-direction:column;min-height:0}
+  .advice .ahead{padding:14px 16px 12px;border-bottom:1px solid var(--border);position:relative}
+  .advice .ahead::after{content:"";position:absolute;left:0;bottom:-1px;height:1px;width:100%;
+    background:linear-gradient(90deg,transparent,var(--violet),transparent);opacity:.55}
+  .advice .atitle{font-family:var(--display);font-size:16px;font-weight:800;letter-spacing:.5px;
+    background:linear-gradient(90deg,#e8eef6,#b388ff,#e8eef6);background-size:200% auto;
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .advice .asub{font-size:11px;color:var(--dim);font-family:var(--mono);margin-top:3px;letter-spacing:1px}
+  .apanel{flex:1;overflow-y:auto;padding:13px 14px 22px}
+  .apanel::-webkit-scrollbar{width:7px}
+  .apanel::-webkit-scrollbar-thumb{background:#1c2a3a;border-radius:4px}
+  .sec-h{display:flex;align-items:center;gap:8px;margin:6px 0 11px;font-size:13px;font-weight:700;color:var(--text);font-family:var(--cn)}
+  .sec-h .bar{width:3px;height:14px;border-radius:2px;background:var(--violet);box-shadow:0 0 10px var(--violet)}
+  .sec-h .n{margin-left:auto;font-size:11px;color:var(--dim);font-family:var(--mono)}
+  .ovw{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:13px}
+  .ovc{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .ovc .v{font-family:var(--display);font-size:22px;font-weight:800;color:var(--cyan)}
+  .ovc .l{font-size:11px;color:var(--muted);margin-top:2px}
+  .cbars{margin-bottom:6px}
+  .cbar{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:11.5px}
+  .cbar .nm{width:52px;color:var(--muted)}
+  .cbar .track{flex:1;height:7px;background:#0e1a28;border-radius:4px;overflow:hidden}
+  .cbar .fill{height:100%;border-radius:4px}
+  .cbar .ct{width:24px;text-align:right;color:var(--dim);font-family:var(--mono)}
+  .trend{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--cyan);border-radius:10px;
+    padding:11px 13px;margin-bottom:11px;transition:.2s}
+  .trend:hover{border-color:var(--violet);box-shadow:0 0 16px rgba(179,136,255,.14)}
+  .trend .tt{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .trend .badge{font-size:10px;padding:2px 8px;border-radius:5px;font-weight:700;font-family:var(--cn)}
+  .trend .cnt{margin-left:auto;font-size:11px;color:var(--dim);font-family:var(--mono)}
+  .trend .ttl{font-size:13px;font-weight:700;font-family:var(--cn)}
+  .trend .body{font-size:12px;line-height:1.62;color:var(--muted)}
+  .trend .adv{margin-top:7px;font-size:12px;line-height:1.62;color:var(--text);border-top:1px dashed var(--border);padding-top:7px}
+  .trend .adv b{color:var(--amber);font-weight:600}
+  .trend .ev{margin-top:6px;font-size:10.5px;color:var(--dim);font-family:var(--mono);line-height:1.5}
+  .trend .ev .e::before{content:"▸ ";color:var(--violet)}
+  .exec{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:11px}
+  .exec .ea{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+  .exec .ea .ic{width:27px;height:27px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px}
+  .exec .ea .ttl{font-size:13px;font-weight:700;font-family:var(--cn)}
+  .exec ul{margin:0;padding:0;list-style:none}
+  .exec li{font-size:12px;line-height:1.62;color:var(--muted);margin-bottom:7px;padding-left:16px;position:relative}
+  .exec li::before{content:"◆";position:absolute;left:0;top:1px;font-size:8px;color:var(--cyan)}
+  .exec li b{color:var(--text);font-weight:600}
+  /* 高管建议角色在 build 时由 --role 固化进 HTML，不在浏览器交互选择 */
+  .role-sel button:hover{box-shadow:0 0 12px color-mix(in srgb,var(--cyan) 40%,transparent)}
+  .role-note{font-size:10.5px;color:var(--dim);margin:0 0 11px;line-height:1.5}
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="dot"></span>
+      <div>
+        <h1>金融创新动态 · 中国作战地图</h1>
+        <div class="sub" id="dateLine">CHINA INNOVATION MAP · 实时情报</div>
+      </div>
+    </div>
+    <div class="legend" id="legend">
+      <div class="leg" data-cat="银行"><span class="sw" style="background:#26e0ff"></span>银行</div>
+      <div class="leg" data-cat="保险"><span class="sw" style="background:#b388ff"></span>保险</div>
+      <div class="leg" data-cat="金融科技"><span class="sw" style="background:#ffb43d"></span>金融科技</div>
+      <div class="stats">新闻 <b id="statN">0</b> · 城市 <b id="statC">0</b></div>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside>
+      <div class="filters">
+        <div class="search">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#93a4bb" stroke-width="2">
+            <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
+          <input id="q" placeholder="搜索公司 / 标题 / 关键词…" />
+        </div>
+        <div class="chips" id="chips">
+          <span class="chip active" data-cat="全部">全部</span>
+          <span class="chip" data-cat="银行">银行</span>
+          <span class="chip" data-cat="保险">保险</span>
+          <span class="chip" data-cat="金融科技">金融科技</span>
+        </div>
+      </div>
+      <div class="list" id="list"></div>
+    </aside>
+
+    <div class="mapwrap">
+      <div class="mapbar">
+        <div class="left">
+          <div class="maptitle">LIVE <b>INTELLIGENCE</b></div>
+          <span class="live"><span class="l"></span>LIVE</span>
+          <div class="vbtns" id="vbtns">
+            <button class="vbtn active" data-view="china">中国</button>
+            <button class="vbtn" data-view="world">世界</button>
+          </div>
+        </div>
+        <div class="right">
+          <span class="clock" id="clock">--:--:--</span>
+          <button class="xbtn" id="exportBtn">⬇ 导出 Excel</button>
+          <span class="coordbar" id="coordBar">经纬度 —</span>
+        </div>
+      </div>
+      <div id="map"></div>
+      <div class="sample-badge" id="sampleBadge">⚠ 示例数据 · 替换 NEWS 数组即可接入真实新闻</div>
+
+      <div class="detail" id="detail">
+        <span class="close" id="detailClose">✕</span>
+        <div class="dhead">
+          <span class="tag" id="dTag"></span>
+          <span class="dtitle" id="dTitle"></span>
+          <a class="dlink" id="dLink" target="_blank" rel="noopener">查看原文 ↗</a>
+        </div>
+        <div class="grid">
+          <div class="row full"><span class="k">事件内容：</span><span id="dEvent"></span></div>
+          <div class="row"><span class="k">关注原因：</span><span id="dWhy"></span></div>
+          <div class="row"><span class="k">创新点：</span><span id="dInno"></span></div>
+          <div class="row full"><span class="k">值得学习：</span><span id="dLearn"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="advice">
+      <div class="ahead">
+        <div class="atitle">建议区 · ADVISORY</div>
+        <div class="asub" id="advUpdated">EXECUTIVE BRIEF · 数据驱动</div>
+      </div>
+      <div class="apanel" id="apanel"></div>
+    </aside>
+  </div>
+
+  <!-- ===== ECharts 库（构建时内联） ===== -->
+  <script>__ECHARTS_LIB__</script>
+  <!-- ===== 世界地图 GeoJSON（构建时内联） ===== -->
+  <script>const WORLD_GEOJSON = __WORLD_JSON__;</script>
+  <!-- ===== 中国省份 GeoJSON（构建时内联） ===== -->
+  <script>const CHINA_GEOJSON = __CHINA_JSON__;</script>
+
+  <script>
+  /* =========================================================================
+     新闻数据源  NEWS  —— 「生成器框架」唯一需替换的部分 ——
+     字段（与 wealth-innovation-briefing 简报一一对应）：
+       time  "YYYY-MM-DD HH:MM"  用于左侧按时间排序
+       category  大类：财富管理 / 银行贷款 / 银保保险
+       direction  方向（存款理财/公募私募/银保/信托/个人信用贷款/信用卡分期/汽融/房贷/小微…）
+       company  具体公司   city  地点名(仅展示)   coord [经度,纬度] 决定落点
+       title  link  event  why  innovation  learn
+     把 __NEWS__ 替换成真实新闻数组即可；或用 build.py 从 news.xlsx / Supabase 生成。
+     ========================================================================= */
+  const NEWS = __NEWS__;
+  const SAMPLE_MODE = __SAMPLE__;
+  const SUGGESTIONS = __SUGGESTIONS__;
+
+  const CAT_COLOR = {"银行":"#26e0ff","保险":"#b388ff","金融科技":"#ffb43d"};
+
+  /* 按新闻时间排序后的原始下标序列 —— 用于"挨个闪烁"扫描 */
+  const order = NEWS.map((n,i)=>i).sort((a,b)=> NEWS[a].time.localeCompare(NEWS[b].time));
+
+  let activeCat = "全部";
+  let query = "";
+  let selectedIdx = -1;
+  let currentView = "china";
+
+  /* ---------- 地图初始化（延迟到首屏绘制后，避免大体积 GeoJSON 阻塞渲染） ---------- */
+  let chart;
+  function initMap(){
+    echarts.registerMap('world', {geoJSON: WORLD_GEOJSON});
+    echarts.registerMap('china', {geoJSON: CHINA_GEOJSON});
+    chart = echarts.init(document.getElementById('map'), null, {renderer:'canvas'});
+    window.addEventListener('resize', ()=>chart && chart.resize());
+
+  function geoOpt(){
+    const isChina = currentView==='china';
+    return {
+      map: isChina?'china':'world',
+      roam:true,
+      zoom: isChina?1.5:1.25,
+      center: isChina?[105,36]:[68,22],
+      scaleLimit:{min:1,max:8},
+      itemStyle:{
+        areaColor: isChina?'#0c1828':'#0d1a2c',
+        borderColor: isChina?'#4d7398':'#26425f',
+        borderWidth: isChina?1.1:0.6,
+        shadowColor: isChina?'rgba(38,224,255,.35)':'rgba(38,224,255,.18)',
+        shadowBlur: isChina?10:6
+      },
+      emphasis:{ itemStyle:{areaColor:'#16304a',borderColor:'#26e0ff'}, label:{show:false} },
+      select:{ itemStyle:{areaColor:'#16304a'}, label:{show:false} }
+    };
+  }
+
+  function buildPoints(){
+    return NEWS.map((n,i)=>({
+      name: n.company,
+      value: [n.coord[0], n.coord[1], 1],
+      itemStyle: {color: CAT_COLOR[n.category] || '#26e0ff'},
+      news: n, _idx: i
+    }));
+  }
+
+  function baseOption(){
+    return {
+      backgroundColor:'transparent',
+      geo: geoOpt(),
+      tooltip:{
+        trigger:'item', enterable:false, confine:true, className:'news-tip',
+        backgroundColor:'rgba(8,14,22,.95)', borderColor:'#1c2a3a', borderWidth:1, padding:12,
+        extraCssText:'border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.6)',
+        formatter: tipHtml
+      },
+      series:[
+        {
+          id:'base',
+          type:'effectScatter', coordinateSystem:'geo', data: buildPoints(),
+          symbolSize:12, showEffectOn:'render',
+          rippleEffect:{ brushType:'stroke', scale:3, period:4, breathScale:true }, zlevel:3,
+          label:{
+            show:true, position:'right', formatter:p=>p.data.news.company,
+            color:'#dce8f5', fontSize:10.5, fontWeight:'bold',
+            textBorderColor:'#05080f', textBorderWidth:3,
+            backgroundColor:'rgba(8,14,22,.6)', padding:[2,6], borderRadius:4
+          },
+          itemStyle:{ shadowBlur:12, shadowColor:'rgba(38,224,255,.5)' },
+          emphasis:{ scale:1.6, label:{color:'#fff',fontWeight:'bold'} },
+          animationDuration:1400, animationEasing:'cubicOut',
+          animationDelay:function(idx){ return order.indexOf(idx)*160; }
+        }
+      ]
+    };
+  }
+
+  function tipHtml(p){
+    if(p.seriesType!=='effectScatter') return '';
+    const n=p.data.news, col=CAT_COLOR[n.category]||'#26e0ff';
+    return `
+      <div class="nt-co" style="border-left:3px solid ${col};padding-left:8px">${n.title}</div>
+      <div class="nt-meta">${n.company} · ${n.city} · ${n.time} · ${n.direction}</div>
+      <div class="nt-row"><b>事件：</b>${n.event}</div>
+      <div class="nt-row"><b>关注原因：</b>${n.why}</div>
+      <div class="nt-row"><span class="vi">创新点：</span>${n.innovation}</div>
+      <div class="nt-row"><span class="le">值得学习：</span>${n.learn}</div>
+      <div class="nt-link">🔗 ${n.link}</div>`;
+  }
+
+  chart.setOption(baseOption());
+  chart.on('click', p=>{ if(p.data && p.data._idx!=null) selectNews(p.data._idx,false); });
+  chart.getZr().on('mousemove', e=>{
+    const g=chart.convertFromPixel({geoIndex:0},[e.offsetX,e.offsetY]);
+    if(g) document.getElementById('coordBar').textContent=`经度 ${g[0].toFixed(2)} · 纬度 ${g[1].toFixed(2)}`;
+  });
+  }
+
+  /* 首屏先绘制界面框架，再异步初始化地图（大体积 GeoJSON 解析后置，提速首屏） */
+  if(document.readyState==='complete') requestAnimationFrame(initMap);
+  else window.addEventListener('load', ()=>requestAnimationFrame(initMap));
+
+  /* ---------- 视图切换（世界 / 中国） ---------- */
+  document.getElementById('vbtns').addEventListener('click', e=>{
+    const b=e.target.closest('.vbtn'); if(!b) return;
+    document.querySelectorAll('#vbtns .vbtn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); currentView=b.dataset.view;
+    if(chart) chart.setOption({geo: geoOpt()});
+  });
+
+  /* ---------- 左侧列表 ---------- */
+  function visibleNews(){
+    return NEWS.map((n,i)=>({n,i}))
+      .filter(o=> activeCat==="全部" || o.n.category===activeCat)
+      .filter(o=>{ if(!query) return true;
+        const s=(o.n.title+o.n.company+o.n.event+o.n.direction).toLowerCase();
+        return s.includes(query.toLowerCase()); })
+      .sort((a,b)=> b.n.time.localeCompare(a.n.time));
+  }
+  function renderList(){
+    const box=document.getElementById('list'), items=visibleNews();
+    box.innerHTML = items.map(o=>{
+      const n=o.n, col=CAT_COLOR[n.category]||'#26e0ff';
+      return `<div class="card ${o.i===selectedIdx?'sel':''}" data-i="${o.i}" style="border-left-color:${col}">
+        <div class="top"><span class="time">${n.time}</span>
+          <span class="tag" style="background:${col}22;color:${col}">${n.category} · ${n.direction}</span></div>
+        <div class="title">${n.title}</div>
+        <div class="meta"><span class="loc">${n.city}</span><span>${n.company}</span><span class="dir">${n.direction}</span></div>
+      </div>`;
+    }).join('') || `<div style="color:#5d7088;font-size:12.5px;padding:20px;text-align:center">无匹配新闻</div>`;
+    box.querySelectorAll('.card').forEach(c=> c.onclick=()=>selectNews(+c.dataset.i,true));
+    box.classList.add('ready');
+  }
+
+  /* ---------- 选中联动 ---------- */
+  function selectNews(idx, fromList){
+    if(!chart) return;
+    selectedIdx=idx; const n=NEWS[idx];
+    chart.dispatchAction({type:'downplay', seriesIndex:0});
+    chart.dispatchAction({type:'highlight', seriesIndex:0, dataIndex:idx});
+    chart.dispatchAction({type:'showTip', seriesIndex:0, dataIndex:idx});
+    chart.setOption({geo:{center:n.coord, zoom:Math.max(chart.getOption().geo[0].zoom,3)}});
+    renderList(); showDetail(n);
+  }
+  function showDetail(n){
+    const col=CAT_COLOR[n.category]||'#26e0ff', d=document.getElementById('detail');
+    const tag=document.getElementById('dTag');
+    tag.textContent=`${n.category} · ${n.direction}`; tag.style.cssText=`background:${col}22;color:${col}`;
+    document.getElementById('dTitle').textContent=n.title;
+    document.getElementById('dLink').href=n.link;
+    document.getElementById('dEvent').textContent=n.event;
+    document.getElementById('dWhy').textContent=n.why;
+    document.getElementById('dInno').textContent=n.innovation;
+    document.getElementById('dLearn').textContent=n.learn;
+    d.classList.add('show');
+  }
+  document.getElementById('detailClose').onclick=()=>{
+    document.getElementById('detail').classList.remove('show'); selectedIdx=-1; renderList();
+    chart.dispatchAction({type:'downplay', seriesIndex:0});
+  };
+
+  /* ---------- 筛选 / 搜索 ---------- */
+  document.getElementById('chips').addEventListener('click', e=>{
+    const c=e.target.closest('.chip'); if(!c) return;
+    document.querySelectorAll('#chips .chip').forEach(x=>x.classList.remove('active'));
+    c.classList.add('active'); activeCat=c.dataset.cat; renderList();
+  });
+  document.getElementById('legend').addEventListener('click', e=>{
+    const l=e.target.closest('.leg'); if(!l) return; l.classList.toggle('off');
+    const cat=l.dataset.cat;
+    document.querySelectorAll('#chips .chip').forEach(x=>x.classList.remove('active'));
+    const chip=[...document.querySelectorAll('#chips .chip')].find(x=>x.dataset.cat===cat);
+    if(chip){chip.classList.add('active');activeCat=cat;} else {document.querySelector('#chips .chip').classList.add('active');activeCat="全部";}
+    renderList();
+  });
+  document.getElementById('q').addEventListener('input', e=>{ query=e.target.value.trim(); renderList(); });
+
+  /* ---------- 导出 Excel ---------- */
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const rows=NEWS.map(n=>({
+      时间:n.time, 大类:n.category, 方向:n.direction, 公司:n.company, 城市:n.city,
+      经度:n.coord[0], 纬度:n.coord[1], 标题:n.title, 链接:n.link,
+      事件内容:n.event, 关注原因:n.why, 创新点:n.innovation, 值得学习:n.learn
+    }));
+    const ts=new Date().toISOString().slice(0,10);
+    if(window.XLSX){
+      const ws=XLSX.utils.json_to_sheet(rows);
+      const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "新闻");
+      XLSX.writeFile(wb, `金融创新新闻数据_${ts}.xlsx`);
+    } else {
+      const blob=new Blob([JSON.stringify(NEWS,null,2)],{type:'application/json'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`news_${ts}.json`; a.click();
+    }
+  });
+
+  /* ---------- 统计 + 时钟 ---------- */
+  function stats(){
+    document.getElementById('statN').textContent=NEWS.length;
+    document.getElementById('statC').textContent=new Set(NEWS.map(n=>n.city)).size;
+    document.getElementById('dateLine').textContent='GLOBAL INNOVATION MAP · '+(NEWS[0]?NEWS[0].time.slice(0,10):new Date().toISOString().slice(0,10));
+  }
+  function tick(){
+    const d=new Date();
+    const p=x=>String(x).padStart(2,'0');
+    document.getElementById('clock').textContent=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
+  setInterval(tick,1000); tick();
+
+  /* ---------- 建议区（右侧面板渲染） ---------- */
+  function renderAdvice(){
+    const s = SUGGESTIONS || {};
+    const upd = document.getElementById('advUpdated');
+    if(upd) upd.textContent = '数据截至 ' + ((s.span && s.span[1]) ? s.span[1] : '') +
+      (s.updated ? (' · 生成 ' + s.updated) : '');
+
+    const secH = (t, n, c) => `<div class="sec-h"><span class="bar"></span>${t}<span class="n">${c!=null?c:''}</span></div>`;
+
+    const maxCat = Math.max(1, ...Object.values(s.catCounts || {}));
+    const cb = Object.entries(s.catCounts || {}).map(([k, v]) => {
+      const col = CAT_COLOR[k] || '#26e0ff';
+      return `<div class="cbar"><span class="nm">${k}</span>` +
+        `<span class="track"><span class="fill" style="width:${Math.round(v / maxCat * 100)}%;background:${col};box-shadow:0 0 8px ${col}"></span></span>` +
+        `<span class="ct">${v}</span></div>`;
+    }).join('');
+
+    const ovw = `<div class="ovw">
+        <div class="ovc"><div class="v">${s.total || 0}</div><div class="l">新闻总量</div></div>
+        <div class="ovc"><div class="v" style="font-size:16px;line-height:1.5;margin-top:4px">${(s.span && s.span[0] ? s.span[0].slice(5) : '—')}<br>→ ${(s.span && s.span[1] ? s.span[1].slice(5) : '—')}</div><div class="l">时间跨度</div></div>
+      </div><div class="cbars">${cb}</div>`;
+
+    const trends = (s.trends || []).map(t => {
+      const col = t.color || '#26e0ff';
+      const ev = (t.evidence || []).map(e => `<div class="e">${e}</div>`).join('');
+      return `<div class="trend" style="border-left-color:${col}">
+          <div class="tt"><span class="badge" style="background:${col}22;color:${col}">${t.dir}</span>
+            <span class="ttl">${t.cat} · 趋势</span><span class="cnt">${t.count} 条</span></div>
+          <div class="body">${t.trend}</div>
+          <div class="adv"><b>建议：</b>${t.advice}</div>
+          ${ev ? `<div class="ev">${ev}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    const roles = s.execAdvice || [];
+    const roleName = (roles[0] || {}).audience || '视角';
+    const exec = roles.map(e => `<div class="exec">
+        <div class="ea"><span class="ic" style="background:${e.color}22;color:${e.color}">${e.icon}</span>
+          <span class="ttl">${e.audience}</span></div>
+        <ul>${e.points.map(p => `<li>${p}</li>`).join('')}</ul></div>`).join('');
+
+    const panel = document.getElementById('apanel');
+    if(panel) panel.innerHTML = ovw + secH('主要趋势', 'TRENDS', (s.trends || []).length) +
+      trends + secH('高管建议 · ' + roleName, 'EXECUTIVE ADVICE', roles.length) + exec;
+  }
+  renderAdvice();
+
+  stats(); renderList();
+  /* 真实数据则隐藏"示例数据"水印 */
+  if(!SAMPLE_MODE){ const sb=document.getElementById('sampleBadge'); if(sb) sb.style.display='none'; }
+  </script>
+</body>
+</html>
