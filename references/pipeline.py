@@ -22,7 +22,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import build
 
 HERE = pathlib.Path(__file__).resolve().parent
-XLSX = HERE / "news.xlsx"
+XLSX = pathlib.Path.cwd() / "news.xlsx"   # 数据落在用户当前工作目录，不污染技能安装目录
 TARGET = 5
 
 # 20 个细分领域：(大类, 方向, 搜索查询)  —— 分类真理源
