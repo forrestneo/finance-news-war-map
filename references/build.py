@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""金融创新全球作战地图 —— 生成器流水线（单一离线 HTML）。
+"""金融创新全球作战地图 —— 生成器流水线（单一离线 HTML；仅本地文件读写，无任何对外网络请求）。
+
+仅做本地文件读写（news.xlsx 与生成的 HTML 落在当前工作目录），不连接任何远程服务。
 用法：
-  .venv/Scripts/python build.py init                 # 由示例生成 news.xlsx（可编辑数据源，标记示例）
-  .venv/Scripts/python build.py build                # 读 news.xlsx -> 生成单文件 HTML（数据内联快照）
-  .venv/Scripts/python build.py build --source supabase   # 先从 Supabase 拉取再生成
-  .venv/Scripts/python build.py build --source sample     # 用内置示例数据生成（标记示例）
-  .venv/Scripts/python build.py pull                 # Supabase -> news.xlsx
-  .venv/Scripts/python build.py push                # news.xlsx -> Supabase（按 title upsert，自动去重）
-  .venv/Scripts/python build.py merge <json文件>     # 把真实新闻并入 news.xlsx，已存在的自动跳过（去重）
-  .venv/Scripts/python build.py replace <json文件>   # 只移除示例行，用真实新闻替换（保留已有真实数据，按内容去重）
+  python build.py init                      # 由内置示例生成 news.xlsx（可编辑数据源，标记示例）
+  python build.py build                     # 读 news.xlsx -> 生成单文件离线 HTML（数据内联快照）
+  python build.py build --source sample     # 用内置示例数据生成（HTML 标注'示例数据'水印，非真实情报）
+  python build.py build --role "浙江省分行行长"  # 指定建议区视角并固化进 HTML
+  python build.py merge <json文件>          # 把真实新闻并入 news.xlsx，已存在的自动跳过（去重）
+  python build.py replace <json文件>        # 只移除示例行，用真实新闻替换（保留已有真实数据，按内容去重）
 """
 import argparse, json, pathlib, re, sys
 from collections import Counter
@@ -239,16 +239,14 @@ def dedup(news, keep_first=True):
     return out
 
 def load_news(source):
-    if source == "supabase":
-        import db
-        print("从 Supabase 拉取…")
-        return db.pull()
     if source == "sample":
+        print("[示例] 使用内置示例数据（HTML 将标注'⚠ 示例数据'水印，请勿当作真实情报）")
         return json.loads(SAMPLE.read_text(encoding="utf-8"))
-    # 默认：xlsx；不存在则回退 sample
     if XLSX.exists():
         return xlsx_to_news(XLSX)
-    print("未找到 news.xlsx，使用 news_sample.json")
+    # 无 news.xlsx 且无显式 --source sample：明确回退到示例并开启水印，杜绝"伪装成真实数据"
+    print("[警告] 未找到 news.xlsx，回退到内置示例数据（示例水印已开启，非真实情报）。"
+          "如需真实数据请先 `build.py init` 或传入真实 JSON 后 `merge`。")
     return json.loads(SAMPLE.read_text(encoding="utf-8"))
 
 def xlsx_to_news(path):
@@ -318,7 +316,8 @@ def build_html(news, is_sample=False, source="xlsx", role=None):
 def build(source="xlsx", role=None):
     news = load_news(source)
     news = dedup(news)
-    build_html(news, is_sample=(source == "sample"), source=source, role=role)
+    is_sample = (source == "sample") or (source == "xlsx" and not XLSX.exists())
+    build_html(news, is_sample=is_sample, source=source, role=role)
 
 def cmd_init():
     news = json.loads(SAMPLE.read_text(encoding="utf-8"))
@@ -326,18 +325,6 @@ def cmd_init():
         n["is_sample"] = True          # 标记为示例，replace 时只清这些行
     news_to_xlsx(news, XLSX)
     print(f"已生成可编辑数据源：{XLSX}  ({len(news)} 行，标记为示例数据)")
-
-def cmd_pull():
-    import db
-    news = db.pull()
-    news = dedup(news)
-    news_to_xlsx(news, XLSX)
-    print(f"已从 Supabase 拉取并写入：{XLSX}  ({len(news)} 行)")
-
-def cmd_push():
-    import db
-    news = xlsx_to_news(XLSX)
-    db.push(news)
 
 def cmd_merge(json_path, clear=False):
     """并入真实新闻：clear=True 为 replace 模式，只移除标记为示例(is_sample)的行，
@@ -360,17 +347,15 @@ def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init")
-    b = sub.add_parser("build"); b.add_argument("--source", default="xlsx", choices=["xlsx","supabase","sample"])
+    b = sub.add_parser("build")
+    b.add_argument("--source", default="xlsx", choices=["xlsx", "sample"],
+                   help="xlsx=读本地 news.xlsx（默认）；sample=用内置示例（带示例水印，非真实情报）")
     b.add_argument("--role", default=None, help="建议区视角/角色，如 '浙江省分行行长'；不填用默认(金融高管视角)")
-    sub.add_parser("pull")
-    sub.add_parser("push")
     m = sub.add_parser("merge"); m.add_argument("json")
     r = sub.add_parser("replace"); r.add_argument("json")
     args = ap.parse_args()
     if args.cmd == "init": cmd_init()
     elif args.cmd == "build": build(args.source, args.role)
-    elif args.cmd == "pull": cmd_pull()
-    elif args.cmd == "push": cmd_push()
     elif args.cmd == "merge": cmd_merge(args.json, clear=False)
     elif args.cmd == "replace": cmd_merge(args.json, clear=True)
 
