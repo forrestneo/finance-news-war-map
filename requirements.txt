@@ -1,5 +1,2 @@
-# 核心依赖（build.py / pipeline.py 必需）
-openpyxl>=3.1
-
-# 可选依赖（仅在使用 pull / push 同步 Supabase 时需要）
-# supabase>=2.0
+# 核心依赖（build.py / pipeline.py 必需），已固定版本以保证可复现构建
+openpyxl==3.1.5
