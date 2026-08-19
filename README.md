@@ -15,12 +15,13 @@
 
 ---
 
-## 触发场景
+## 触发场景（须用户明确要求，避免泛化误激活）
 
-- 做新闻情报地图 / 作战地图 / 创新动态地图
-- 搜新闻自动补满、去重并入
-- 给高管出「趋势 + 建议」面板
-- 要离线自包含 HTML 交付物
+- 用户**明确要求**：基于真实搜索新闻，生成金融/行业「新闻作战地图」离线单文件 HTML
+- 用户**明确要求**：把真实新闻按城市经纬度落点做可视化，并附数据驱动的「趋势 + 建议」面板
+- 用户**明确要求**：离线自包含、可双击打开 / 可邮件分享的 HTML 交付物
+
+> 不要因泛泛的"做个地图 / 看下趋势 / 自动补新闻"就自动激活整条流水线；须用户明确指向"真实新闻作战地图离线 HTML"才触发。
 
 ---
 
@@ -59,7 +60,7 @@
 ## 环境准备（Setup）
 
 ```bash
-# 1. 安装依赖（核心只需 openpyxl；supabase 仅 pull/push 时需要）
+# 1. 安装依赖（仅需 openpyxl，版本已固定；本 skill 无远程同步依赖）
 pip install -r requirements.txt
 
 # 2. 在你自己的项目目录里运行（数据与产物写到「当前工作目录」，不污染技能安装目录）
@@ -67,8 +68,8 @@ cd your-project-dir
 python references/build.py init     # 用内置示例生成 news.xlsx（可编辑数据源）
 python references/build.py build    # 读 news.xlsx -> 生成离线单文件 HTML 到当前目录
 
-# 跳过 init 直接 build 也行（缺 news.xlsx 时自动回退内置示例）
-python references/build.py build --role "浙江省分行行长"   # 指定建议区视角并固化进 HTML
+# 跳过 init、直接试用示例：显式加 --source sample（HTML 会标注"示例数据"水印，非真实情报）
+python references/build.py build --source sample --role "浙江省分行行长"   # 指定建议区视角并固化进 HTML
 ```
 
 > 只读资产（`template.html` / `assets/` / `news_sample.json`）已随仓库分发，无需联网下载。
@@ -81,19 +82,18 @@ python references/build.py build --role "浙江省分行行长"   # 指定建议
 finance-news-warmap/
 ├── SKILL.md              # 方法论总结（何时用 / 硬规则 / 架构 / 工作流 / 关键代码模式 / 坑）
 ├── README.md
-├── requirements.txt      # 依赖：openpyxl（核心）/ supabase（可选）
+├── requirements.txt      # 依赖：openpyxl==3.1.5（已固定，无远程同步依赖）
 ├── .gitignore
 └── references/
     ├── template.html     # Palantir 风三栏地图模板（占位符、中国/世界切换、右侧建议区）
-    ├── build.py          # 生成器（init/build/merge/replace + 建议区计算 + 去重）
+    ├── build.py          # 生成器（init/build/merge/replace + 建议区计算 + 去重，纯本地）
     ├── pipeline.py       # 20 子领域 taxonomy 驱动的 search/status/fill/rebuild 补满流水线
-    ├── news_sample.json  # 内置示例数据源（11 条，init/build 缺 xlsx 时回退用）
-    ├── db.py             # Supabase 读写（可选，pull/push 用；凭据走本地 config.toml）
-    ├── config.example.toml
+    ├── news_sample.json  # 内置示例数据源（11 条，仅 --source sample 或 init 时使用，带示例水印）
     └── assets/           # 离线单文件必需，已随仓库分发
         ├── echarts.min.js
         ├── world.json
-        └── china.json
+        ├── china.json
+        └── xlsx.full.min.js
 ```
 
 ---
@@ -134,4 +134,4 @@ finance-news-warmap/
 
 ---
 
-> ⚠️ 本 Skill 强制「真实新闻、不编造、去重不重复、离线单文件」四条底线，请勿用于生成虚假情报或误导式可视化。
+> ⚠️ 本 Skill 强制「真实新闻、不编造、去重不重复、离线单文件」四条底线；**纯本地运行、无任何对外网络请求、不连接任何远程数据库**，请勿用于生成虚假情报或误导式可视化。
