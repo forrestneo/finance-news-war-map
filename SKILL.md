@@ -1,8 +1,9 @@
 ---
 name: finance-news-warmap
-description: 金融/行业「新闻作战地图」构建 skill。把真实搜索新闻按经纬度落点，生成 Palantir 风格、可离线双击打开的单文件 HTML（ECharts 地理散点 + 中国/世界切换 + 可筛选可悬停 + 右侧数据驱动「建议区」）。配套 search→compile→fill 流水线，把每个细分领域自动补满 N 条真实新闻并去重，绝不编造数据。触发：做新闻情报地图、作战地图、创新动态地图、搜新闻自动补满、给高管出趋势与建议面板、要离线自包含 HTML 交付物。**调用前须由 agent 执行 WebSearch 联网能力探测（不可用则中止，不编造/不占位；此为 agent 侧流程约束，非代码强制断言）。所有库/字体/地图数据均随技能本地分发并在构建时内联，运行时无任何 CDN/外部请求。**
+description: 金融/行业「新闻作战地图」构建 skill（纯本地、离线单文件 HTML 生成器）。把用户经 WebSearch 搜来的真实新闻按城市经纬度落点，生成 Palantir 风格、可离线双击打开的单文件 HTML（ECharts 地理散点 + 中国/世界切换 + 可筛选可悬停 + 右侧数据驱动「建议区」）。所有库/字体/地图数据随技能本地分发并在构建时内联，运行时无任何 CDN/外部请求、无任何对外网络传输；配套 search→compile→fill 流水线把每个细分领域自动补满 N 条真实新闻并去重，绝不编造数据。仅做本地文件读写（news.xlsx 与生成的 HTML 落在当前工作目录），不连接任何远程服务。**触发条件（须用户明确要求，避免泛化误激活）：用户要基于真实搜索新闻生成金融/行业作战地图离线 HTML，或要把真实新闻按经纬落点可视化并附数据驱动建议区；非此类明确需求不自动触发。** 调用前须由 agent 执行 WebSearch 联网能力探测（不可用则中止，不编造/不占位；此为 agent 侧流程约束，非代码强制断言）。
 agent_created: true
-version: 1.1.0
+version: 1.2.0
+permissions: "filesystem: read+write current working directory (news.xlsx, 生成的 HTML); network: none (运行时无任何对外网络请求；WebSearch 由调用方 agent 执行); external_services: none"
 ---
 
 # 金融创新作战地图（Finance News War Map）
@@ -54,18 +55,24 @@ version: 1.1.0
 
 ## 〇·六、数据安全与对外传输声明（透明性 · 回应供应链/外传审查）
 
-本 skill 是**纯本地生成器**，不存在隐藏或自动化的对外网络调用。所有对外传输都需用户显式触发并自带凭据：
+本 skill 是**纯本地生成器，不含任何远程同步能力**：`build.py` / `pipeline.py` / `template.html` 在运行时**不发起任何对外网络请求**，也不连接任何远程数据库 / 第三方服务。
 
-1. **联网搜索（WebSearch）由调用方 agent 执行，不是 skill 代码联网**：`build.py` / `pipeline.py` / `template.html` 在运行时**不发起任何 WebSearch 或互联网请求**——`pipeline.py search` 只把查询打印出来供人工/agent 去搜。
-2. **离线单文件是强制硬指标（无 CDN / 无外部字体）**：`template.html` 不再引用任何外部 `https://` 的 `<script>` 或 `<link>`。ECharts 库、world/china GeoJSON、**xlsx 导出库**全部随技能分发于 `assets/` 并在构建时**内联**进 HTML；字体仅用系统字体栈回退（Microsoft YaHei / PingFang SC 等）。生成的 HTML 双击离线可用，不经过任何第三方服务器。
-3. **远程同步（Supabase pull/push）完全可选 + 显式 + 用户凭据**：
-   - 仅当用户主动运行 `build.py pull` / `push` / `build --source supabase` 时才会发生；
-   - 需要用户在本地 `config.toml` 显式填入**自己的** Supabase url/key/table，缺文件即报错中止，绝不静默连接；
-   - 默认 `build`（无 `--source`）只读写本地 `news.xlsx`，**完全不触碰任何远程**；
-   - 不存在自动上传、环境变量 harvesting、文件系统枚举用于外传等行为。
-4. **不编造 / 不做离线占位**：WebSearch 不可用且用户未提供本地数据时，按规则立即中止，绝不用记忆编造或离线占位数据蒙混（见「〇·五」）。
+1. **联网搜索（WebSearch）由调用方 agent 执行，不是 skill 代码联网**：脚本内的 `pipeline.py search` 只把查询打印出来供人工 / agent 去搜，运行时不发起任何 WebSearch 或互联网请求。
+2. **离线单文件是强制硬指标（无 CDN / 无外部字体 / 无远程同步）**：`template.html` 不引用任何外部 `https://` 的 `<script>` / `<link>`；ECharts 库、world/china GeoJSON、**xlsx 导出库**全部随技能分发于 `assets/` 并在构建时**内联**进 HTML；字体仅用系统字体栈回退。生成的 HTML 双击离线可用，不经过任何第三方服务器。本 skill **已移除全部 Supabase / 远程数据库读写代码**，不存在 `pull` / `push` / `--source supabase` 之类对外同步入口。
+3. **不编造 / 不做离线占位**：WebSearch 不可用且用户未提供本地数据时，按规则立即中止，绝不用记忆编造或离线占位数据蒙混（见「〇·五」）。内置 `news_sample.json` 仅为开箱试用示例，使用时 HTML 会明确标注「⚠ 示例数据」水印，绝不与真实情报混淆。
 
 > 说明：本 skill 的「只用真实新闻、绝不编造」「调用即探测 WebSearch」等是**对调用 agent 的流程约束（指令）**，由 agent 在调用时落实，而非由 skill 代码在运行时做断言式强制。agent 应如实向用户说明当前环境是否具备联网搜索能力。
+
+## 〇·七、权限与文件访问声明（回应 least-privilege 审查）
+
+本 skill 的能力与数据流向**已最小化**，仅满足「离线单文件 HTML 生成」这一明确目的：
+
+- **文件系统**：仅在**当前工作目录（CWD）**读写两个文件——`news.xlsx`（可编辑数据源）与 `金融创新全球作战地图.html`（生成产物）。只读资产（`template.html` / `assets/` / `news_sample.json`）随技能分发、安装后不改写。绝不访问用户其他目录或系统路径。
+- **网络**：**无**。运行时（build / pipeline / template）不发起任何对外 HTTP / WebSocket / DNS 请求（WebSearch 由调用方 agent 执行，非本 skill 代码联网）。
+- **外部服务 / 凭据**：**无**。不读取环境变量、不连接数据库、不上传 / 外传任何数据。
+- **自动决策**：不自动激活、不静默执行远程操作；所有数据写入都发生在用户显式运行 `build.py` 命令之后，且只写 CWD。
+
+> 调用 agent 应如实告知用户：本 skill 会读取 / 生成用户工作目录下的 `news.xlsx` 与 HTML 文件；除此之外不触碰任何其他资源。
 
 ---
 
@@ -75,6 +82,8 @@ version: 1.1.0
 - 用户想做「**搜新闻 → 编译 JSON → 去重并入 → 自动补满每个细分领域 N 条**」的流水线（杜绝虚拟/占位数据）。
 - 用户想要一个「**建议区 / 洞察面板**」，从实时新闻数据自动总结趋势与高管可执行建议（不是写死的模板话术）。
 - 用户要「**双击可打开、可邮件分享**」的单一离线 HTML（库与地图数据全部内联，不依赖 CDN/网络）。
+
+> **范围限定（避免泛化误激活）**：仅在用户**明确要求**生成这类「真实新闻作战地图离线 HTML」时触发；不要因泛泛的"做个地图 / 看下趋势 / 自动补新闻"就自动激活整条流水线。
 
 ---
 
@@ -115,20 +124,19 @@ assets/       echarts.min.js + world.json + china.json（34 省）← 构建时�
 ```
 references/
 ├── template.html          # Palantir 风三栏地图模板（含占位符，离线单文件目标）
-├── build.py               # 生成器：init/build/merge/replace + 建议区计算 + 去重
+├── build.py               # 生成器：init/build/merge/replace + 建议区计算 + 去重（纯本地）
 ├── pipeline.py            # 20 子领域 taxonomy 驱动的 search/status/fill/rebuild 补满流水线
-├── news_sample.json       # 内置示例数据源（11 条，init/build 缺 xlsx 时回退用）
-├── db.py                  # Supabase 读写（可选，pull/push 用；凭据走本地 config.toml）
-├── config.example.toml    # Supabase 配置样例
+├── news_sample.json       # 内置示例数据源（11 条，仅 `--source sample` 或 init 时使用，带示例水印）
 └── assets/               # 离线单文件必需，已随技能分发
     ├── echarts.min.js     # ~1MB，内联进 HTML
     ├── world.json         # ~1MB，世界地图边界
-    └── china.json         # 中国 34 省边界
+    ├── china.json         # 中国 34 省边界
+    └── xlsx.full.min.js   # 浏览器端导出 .xlsx 用，内联进 HTML
 ```
 
 ### 三·5、环境准备（依赖与目录约定）
 
-1. **装依赖**：`pip install -r requirements.txt`（核心只要 `openpyxl`；`supabase` 仅 pull/push 时需要）。
+1. **装依赖**：`pip install -r requirements.txt`（仅需 `openpyxl`，已固定版本；本 skill 无任何远程同步依赖）。
 2. **数据/产物落在「当前工作目录（CWD），不污染技能安装目录**——这是本 skill 的可分发约定：
    - 只读资产（`template.html` / `assets/` / `news_sample.json`）随技能分发，安装后不应改动；
    - `build.py` 把 `news.xlsx`（数据源）与 `金融创新全球作战地图.html`（产物）写到你**运行命令时所在的目录**；
