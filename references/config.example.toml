@@ -1,5 +1,0 @@
-[supabase]
-# 复制本文件为 config.toml 并填入真实凭据
-url = "https://YOUR-PROJECT.supabase.co"
-key = "YOUR-ANON-OR-SERVICE-KEY"
-table = "news"
